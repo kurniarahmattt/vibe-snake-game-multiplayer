@@ -28,7 +28,75 @@ const TILE_COUNT = 30; // 30x30 grid = 900x900 pixels
 const SPECIAL_FOOD_SPAWN_CHANCE = 0.15;
 const SPECIAL_FOOD_DURATION = 10000;
 
-// Player colors
+// Snake Skins
+const SNAKE_SKINS = {
+    classic: {
+        name: 'Classic Green',
+        bodyColor: '#4ecca3',
+        headColor: '#45b393',
+        powerUpBodyColor: '#ff3333',
+        powerUpHeadColor: '#ff0000',
+        pattern: 'solid'
+    },
+    fire: {
+        name: 'Fire Snake',
+        bodyColor: '#ff6b35',
+        headColor: '#ff4500',
+        powerUpBodyColor: '#ff3333',
+        powerUpHeadColor: '#ff0000',
+        pattern: 'gradient'
+    },
+    ice: {
+        name: 'Ice Snake',
+        bodyColor: '#87ceeb',
+        headColor: '#4682b4',
+        powerUpBodyColor: '#ff3333',
+        powerUpHeadColor: '#ff0000',
+        pattern: 'solid'
+    },
+    rainbow: {
+        name: 'Rainbow Snake',
+        bodyColor: '#ff69b4',
+        headColor: '#9370db',
+        powerUpBodyColor: '#ff3333',
+        powerUpHeadColor: '#ff0000',
+        pattern: 'rainbow'
+    },
+    neon: {
+        name: 'Neon Snake',
+        bodyColor: '#00ff41',
+        headColor: '#00cc33',
+        powerUpBodyColor: '#ff3333',
+        powerUpHeadColor: '#ff0000',
+        pattern: 'neon'
+    },
+    gold: {
+        name: 'Golden Snake',
+        bodyColor: '#ffd700',
+        headColor: '#ffb347',
+        powerUpBodyColor: '#ff3333',
+        powerUpHeadColor: '#ff0000',
+        pattern: 'metallic'
+    },
+    dark: {
+        name: 'Shadow Snake',
+        bodyColor: '#2c2c54',
+        headColor: '#40407a',
+        powerUpBodyColor: '#ff3333',
+        powerUpHeadColor: '#ff0000',
+        pattern: 'solid'
+    },
+    ocean: {
+        name: 'Ocean Snake',
+        bodyColor: '#006994',
+        headColor: '#004d6b',
+        powerUpBodyColor: '#ff3333',
+        powerUpHeadColor: '#ff0000',
+        pattern: 'waves'
+    }
+};
+
+// Player colors (fallback for old system)
 const PLAYER_COLORS = [
     { normal: '#4ecca3', head: '#45b393', name: 'Green' },
     { normal: '#54a0ff', head: '#2e86de', name: 'Blue' },
@@ -118,7 +186,7 @@ generateFood();
 io.on('connection', (socket) => {
     console.log(`Player connected: ${socket.id}`);
     
-    // Assign color to player
+    // Assign color to player (fallback)
     const colorIndex = Object.keys(players).length % PLAYER_COLORS.length;
     const playerColor = PLAYER_COLORS[colorIndex];
     
@@ -133,6 +201,8 @@ io.on('connection', (socket) => {
         nextDirection: { dx: 0, dy: 0 },
         score: 0,
         color: playerColor,
+        skin: 'classic', // Default skin
+        skinData: SNAKE_SKINS['classic'],
         alive: true,
         powerUpActive: false,
         powerUpEndTime: 0
@@ -158,6 +228,28 @@ io.on('connection', (socket) => {
     socket.on('changeDirection', (data) => {
         if (players[socket.id] && players[socket.id].alive) {
             players[socket.id].nextDirection = data;
+        }
+    });
+    
+    // Handle skin changes
+    socket.on('changeSkin', (data) => {
+        if (players[socket.id] && SNAKE_SKINS[data.skin]) {
+            players[socket.id].skin = data.skin;
+            players[socket.id].skinData = SNAKE_SKINS[data.skin];
+            
+            // Update color for backward compatibility
+            players[socket.id].color = {
+                normal: SNAKE_SKINS[data.skin].bodyColor,
+                head: SNAKE_SKINS[data.skin].headColor,
+                name: SNAKE_SKINS[data.skin].name
+            };
+            
+            // Broadcast skin change to all players
+            io.emit('playerSkinChanged', {
+                playerId: socket.id,
+                skin: data.skin,
+                skinData: SNAKE_SKINS[data.skin]
+            });
         }
     });
     

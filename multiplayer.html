@@ -171,6 +171,81 @@
             background: #e74c3c;
         }
 
+        /* Skin Selection Styles */
+        .skin-selection {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .skin-selection.show {
+            display: flex;
+        }
+
+        .skin-modal {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            max-width: 90vw;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .skin-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .skin-option {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid transparent;
+            border-radius: 15px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .skin-option:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .skin-option.selected {
+            border-color: #4ecca3;
+            background: rgba(78, 204, 163, 0.2);
+        }
+
+        .skin-preview {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 10px;
+            border-radius: 10px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .skin-name {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .skin-description {
+            font-size: 0.8em;
+            opacity: 0.8;
+        }
+
         /* Mobile Controls */
         .mobile-controls {
             display: none;
@@ -354,6 +429,9 @@
             <div class="info-box">
                 <div>Your Color: <span id="myColor">-</span></div>
             </div>
+            <div class="info-box">
+                <button id="skinBtn" style="background: rgba(255, 255, 255, 0.2); border: 2px solid white; color: white; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 0.9em;">🎨 Skin</button>
+            </div>
         </div>
 
         <canvas id="gameCanvas" width="900" height="900"></canvas>
@@ -396,6 +474,20 @@
         <button onclick="location.reload()">Play Again</button>
     </div>
 
+    <!-- Skin Selection Modal -->
+    <div class="skin-selection" id="skinSelection">
+        <div class="skin-modal">
+            <h2>🎨 Choose Your Snake Skin</h2>
+            <div class="skin-grid" id="skinGrid">
+                <!-- Skin options will be populated by JavaScript -->
+            </div>
+            <div style="text-align: center; margin-top: 20px;">
+                <button onclick="closeSkinSelection()" style="margin-right: 10px;">Cancel</button>
+                <button onclick="applySkin()" id="applySkinBtn" disabled>Apply Skin</button>
+            </div>
+        </div>
+    </div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const canvas = document.getElementById('gameCanvas');
@@ -416,6 +508,86 @@
         let tileCount = 30;
         let gridSize = 30;
         let blinkState = {};
+
+        // Snake Skins
+        const snakeSkins = {
+            classic: {
+                name: 'Classic Green',
+                description: 'The original snake look',
+                bodyColor: '#4ecca3',
+                headColor: '#45b393',
+                powerUpBodyColor: '#ff3333',
+                powerUpHeadColor: '#ff0000',
+                pattern: 'solid'
+            },
+            fire: {
+                name: 'Fire Snake',
+                description: 'Hot and dangerous',
+                bodyColor: '#ff6b35',
+                headColor: '#ff4500',
+                powerUpBodyColor: '#ff3333',
+                powerUpHeadColor: '#ff0000',
+                pattern: 'gradient'
+            },
+            ice: {
+                name: 'Ice Snake',
+                description: 'Cool and slippery',
+                bodyColor: '#87ceeb',
+                headColor: '#4682b4',
+                powerUpBodyColor: '#ff3333',
+                powerUpHeadColor: '#ff0000',
+                pattern: 'solid'
+            },
+            rainbow: {
+                name: 'Rainbow Snake',
+                description: 'Colorful and vibrant',
+                bodyColor: '#ff69b4',
+                headColor: '#9370db',
+                powerUpBodyColor: '#ff3333',
+                powerUpHeadColor: '#ff0000',
+                pattern: 'rainbow'
+            },
+            neon: {
+                name: 'Neon Snake',
+                description: 'Glowing in the dark',
+                bodyColor: '#00ff41',
+                headColor: '#00cc33',
+                powerUpBodyColor: '#ff3333',
+                powerUpHeadColor: '#ff0000',
+                pattern: 'neon'
+            },
+            gold: {
+                name: 'Golden Snake',
+                description: 'Luxurious and shiny',
+                bodyColor: '#ffd700',
+                headColor: '#ffb347',
+                powerUpBodyColor: '#ff3333',
+                powerUpHeadColor: '#ff0000',
+                pattern: 'metallic'
+            },
+            dark: {
+                name: 'Shadow Snake',
+                description: 'Dark and mysterious',
+                bodyColor: '#2c2c54',
+                headColor: '#40407a',
+                powerUpBodyColor: '#ff3333',
+                powerUpHeadColor: '#ff0000',
+                pattern: 'solid'
+            },
+            ocean: {
+                name: 'Ocean Snake',
+                description: 'Deep blue like the sea',
+                bodyColor: '#006994',
+                headColor: '#004d6b',
+                powerUpBodyColor: '#ff3333',
+                powerUpHeadColor: '#ff0000',
+                pattern: 'waves'
+            }
+        };
+
+        // Current skin
+        let currentSkin = 'classic';
+        let selectedSkin = 'classic';
 
         // Colors
         const foodColor = '#ff6b6b';
@@ -508,6 +680,18 @@
             if (data.playerId === myPlayerId) {
                 finalScoreElement.textContent = data.score;
                 gameOverElement.classList.add('show');
+            }
+        });
+
+        socket.on('playerSkinChanged', (data) => {
+            if (players[data.playerId]) {
+                players[data.playerId].skin = data.skin;
+                players[data.playerId].skinData = data.skinData;
+                players[data.playerId].color = {
+                    normal: data.skinData.bodyColor,
+                    head: data.skinData.headColor,
+                    name: data.skinData.name
+                };
             }
         });
 
@@ -757,7 +941,8 @@
                         } else if (isPoweredUp) {
                             ctx.fillStyle = powerUpLightColor;
                         } else {
-                            ctx.fillStyle = player.color.head;
+                            // Use skin data if available, otherwise fallback to color
+                            ctx.fillStyle = player.skinData ? player.skinData.headColor : player.color.head;
                         }
                         
                         ctx.fillRect(
@@ -843,7 +1028,8 @@
                         } else if (isPoweredUp) {
                             ctx.fillStyle = powerUpLightColor;
                         } else {
-                            ctx.fillStyle = player.color.normal;
+                            // Use skin data if available, otherwise fallback to color
+                            ctx.fillStyle = player.skinData ? player.skinData.bodyColor : player.color.normal;
                         }
                         
                         ctx.fillRect(
@@ -919,6 +1105,115 @@
                 ctx.fill();
             }
         }
+
+        // Skin Selection Functions
+        function initializeSkinSelection() {
+            // Load saved skin
+            const savedSkin = localStorage.getItem('snakeSkin') || 'classic';
+            currentSkin = savedSkin;
+            selectedSkin = savedSkin;
+            
+            const skinGrid = document.getElementById('skinGrid');
+            skinGrid.innerHTML = '';
+            
+            Object.keys(snakeSkins).forEach(skinKey => {
+                const skin = snakeSkins[skinKey];
+                const skinOption = document.createElement('div');
+                skinOption.className = 'skin-option';
+                if (skinKey === currentSkin) {
+                    skinOption.classList.add('selected');
+                }
+                
+                skinOption.innerHTML = `
+                    <div class="skin-preview" id="preview-${skinKey}"></div>
+                    <div class="skin-name">${skin.name}</div>
+                    <div class="skin-description">${skin.description}</div>
+                `;
+                
+                skinOption.onclick = () => selectSkin(skinKey);
+                skinGrid.appendChild(skinOption);
+                
+                // Create preview
+                createSkinPreview(skinKey, skin);
+            });
+        }
+
+        function createSkinPreview(skinKey, skin) {
+            const preview = document.getElementById(`preview-${skinKey}`);
+            const canvas = document.createElement('canvas');
+            canvas.width = 60;
+            canvas.height = 60;
+            const ctx = canvas.getContext('2d');
+            
+            // Draw snake segments
+            const segmentSize = 12;
+            const segments = [
+                { x: 20, y: 20 },
+                { x: 32, y: 20 },
+                { x: 44, y: 20 }
+            ];
+            
+            segments.forEach((segment, index) => {
+                if (index === 0) {
+                    // Head
+                    ctx.fillStyle = skin.headColor;
+                    ctx.fillRect(segment.x, segment.y, segmentSize, segmentSize);
+                    
+                    // Eyes
+                    ctx.fillStyle = 'white';
+                    ctx.fillRect(segment.x + 8, segment.y + 3, 3, 3);
+                    ctx.fillRect(segment.x + 8, segment.y + 9, 3, 3);
+                } else {
+                    // Body
+                    ctx.fillStyle = skin.bodyColor;
+                    ctx.fillRect(segment.x, segment.y, segmentSize, segmentSize);
+                }
+            });
+            
+            preview.appendChild(canvas);
+        }
+
+        function selectSkin(skinKey) {
+            selectedSkin = skinKey;
+            
+            // Update UI
+            document.querySelectorAll('.skin-option').forEach(option => {
+                option.classList.remove('selected');
+            });
+            event.target.closest('.skin-option').classList.add('selected');
+            
+            document.getElementById('applySkinBtn').disabled = false;
+        }
+
+        function applySkin() {
+            currentSkin = selectedSkin;
+            localStorage.setItem('snakeSkin', currentSkin);
+            
+            // Send skin change to server
+            if (socket && myPlayerId) {
+                socket.emit('changeSkin', { skin: currentSkin });
+            }
+            
+            closeSkinSelection();
+        }
+
+        function openSkinSelection() {
+            document.getElementById('skinSelection').classList.add('show');
+        }
+
+        function closeSkinSelection() {
+            document.getElementById('skinSelection').classList.remove('show');
+            selectedSkin = currentSkin; // Reset selection
+            document.getElementById('applySkinBtn').disabled = true;
+        }
+
+        // Initialize skin selection on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeSkinSelection();
+            
+            // Add skin button event listener
+            document.getElementById('skinBtn').addEventListener('click', openSkinSelection);
+        });
 
         // Start drawing loop
         setInterval(drawGame, 50);
