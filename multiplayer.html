@@ -36,6 +36,40 @@
             max-width: 95vw;
         }
 
+        .game-layout {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .game-main {
+            flex: 1;
+            min-width: 600px;
+            max-width: 900px;
+        }
+
+        .game-sidebar {
+            flex: 0 0 300px;
+            min-width: 280px;
+            max-width: 350px;
+        }
+
+        .sidebar-section {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .sidebar-section h3 {
+            margin: 0 0 15px 0;
+            font-size: 1.2em;
+            text-align: center;
+            color: #4ecca3;
+        }
+
         h1 {
             margin-bottom: 20px;
             font-size: 2.5em;
@@ -71,11 +105,10 @@
         }
 
         .players-list {
-            margin-top: 20px;
             background: rgba(255, 255, 255, 0.1);
             padding: 15px;
             border-radius: 10px;
-            max-height: 200px;
+            max-height: 300px;
             overflow-y: auto;
         }
 
@@ -103,7 +136,6 @@
         }
 
         .instructions {
-            margin-top: 20px;
             font-size: 0.9em;
             opacity: 0.9;
             line-height: 1.6;
@@ -352,6 +384,17 @@
             font-size: 20px;
         }
 
+        @media (max-width: 1200px) {
+            .game-layout {
+                flex-direction: column;
+            }
+            
+            .game-sidebar {
+                flex: 1;
+                max-width: 100%;
+            }
+        }
+
         @media (max-width: 1000px) {
             canvas {
                 max-width: 95vw;
@@ -434,22 +477,33 @@
             </div>
         </div>
 
-        <canvas id="gameCanvas" width="900" height="900"></canvas>
-
-        <div class="players-list">
-            <h3>🏆 Leaderboard</h3>
-            <div id="playersList"></div>
-        </div>
-
-        <div class="instructions">
-            <p>🎮 Use Arrow Keys or WASD to control the snake</p>
-            <p>↗️ Use Q/E/Z/C for diagonal movement</p>
-            <p>🍎 Eat red food (+10 pts) to grow</p>
-            <p>⭐ Eat golden star (+50 pts) for INVINCIBILITY!</p>
-            <p>💜 Eat purple food (+30 pts) for ATTACK ABILITY!</p>
-            <p>🔫 Press SPACE/ENTER to shoot bullets (when you have attack ability)</p>
-            <p>🛡️ Power-up: RED blinking, pass through walls & snakes, 10 seconds</p>
-            <p>⚠️ Avoid other players and walls (unless invincible)!</p>
+        <div class="game-layout">
+            <div class="game-main">
+                <canvas id="gameCanvas" width="900" height="900"></canvas>
+            </div>
+            
+            <div class="game-sidebar">
+                <div class="sidebar-section">
+                    <div class="players-list">
+                        <h3>🏆 Leaderboard</h3>
+                        <div id="playersList"></div>
+                    </div>
+                </div>
+                
+                <div class="sidebar-section">
+                    <div class="instructions">
+                        <h3>🎮 How to Play</h3>
+                        <p>🎮 Use Arrow Keys or WASD to control the snake</p>
+                        <p>↗️ Use Q/E/Z/C for diagonal movement</p>
+                        <p>🍎 Eat red food (+10 pts) to grow</p>
+                        <p>⭐ Eat golden star (+50 pts) for INVINCIBILITY!</p>
+                        <p>💜 Eat purple food (+30 pts) for ATTACK ABILITY!</p>
+                        <p>🔫 Press SPACE/ENTER to shoot bullets (when you have attack ability)</p>
+                        <p>🛡️ Power-up: RED blinking, pass through walls & snakes, 10 seconds</p>
+                        <p>⚠️ Avoid other players and walls (unless invincible)!</p>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="mobile-controls">
