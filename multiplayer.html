@@ -446,6 +446,8 @@
             <p>↗️ Use Q/E/Z/C for diagonal movement</p>
             <p>🍎 Eat red food (+10 pts) to grow</p>
             <p>⭐ Eat golden star (+50 pts) for INVINCIBILITY!</p>
+            <p>💜 Eat purple food (+30 pts) for ATTACK ABILITY!</p>
+            <p>🔫 Press SPACE/ENTER to shoot bullets (when you have attack ability)</p>
             <p>🛡️ Power-up: RED blinking, pass through walls & snakes, 10 seconds</p>
             <p>⚠️ Avoid other players and walls (unless invincible)!</p>
         </div>
@@ -462,8 +464,14 @@
                 <div class="dpad-button dpad-downleft" data-direction="downleft">↙️</div>
                 <div class="dpad-button dpad-downright" data-direction="downright">↘️</div>
             </div>
+            <div style="margin-top: 20px; text-align: center;">
+                <button id="shootBtn" style="background: rgba(255, 68, 68, 0.8); border: 2px solid #ff4444; color: white; padding: 15px 30px; border-radius: 10px; cursor: pointer; font-size: 1.2em; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 4px 12px rgba(255, 68, 68, 0.3);">
+                    🔫 SHOOT
+                </button>
+            </div>
             <p style="margin-top: 15px; font-size: 0.9em; opacity: 0.9;">
-                📱 Use the D-pad to control your snake
+                📱 Use the D-pad to control your snake<br>
+                🔫 Press SHOOT when you have attack ability
             </p>
         </div>
     </div>
@@ -505,9 +513,11 @@
         let players = {};
         let food = null;
         let specialFood = null;
+        let attackFood = null;
         let tileCount = 30;
         let gridSize = 30;
         let blinkState = {};
+        let bullets = [];
 
         // Snake Skins
         const snakeSkins = {
@@ -592,6 +602,8 @@
         // Colors
         const foodColor = '#ff6b6b';
         const specialFoodColor = '#ffd700';
+        const attackFoodColor = '#8b5cf6'; // Purple
+        const bulletColor = '#ff4444';
         const gridColor = '#2a2a3e';
         const powerUpColor = '#ff3333';
         const powerUpLightColor = '#ff6666';
@@ -623,6 +635,7 @@
             players = data.players;
             food = data.food;
             specialFood = data.specialFood;
+            attackFood = data.attackFood;
             tileCount = data.tileCount;
             gridSize = data.gridSize;
             
@@ -646,6 +659,7 @@
             players = data.players;
             food = data.food;
             specialFood = data.specialFood;
+            attackFood = data.attackFood;
             updateUI();
             drawGame();
         });
@@ -674,6 +688,37 @@
 
         socket.on('specialFoodExpired', () => {
             specialFood = null;
+        });
+
+        socket.on('attackFoodSpawned', (data) => {
+            attackFood = data;
+        });
+
+        socket.on('attackFoodEaten', (data) => {
+            attackFood = null;
+        });
+
+        socket.on('attackFoodExpired', () => {
+            attackFood = null;
+        });
+
+        socket.on('bulletShot', (data) => {
+            bullets.push(data.bullet);
+        });
+
+        socket.on('playerHit', (data) => {
+            // Player was hit by a bullet
+            console.log(`Player ${data.targetId} hit by ${data.shooterId}, new length: ${data.newLength}`);
+        });
+
+        socket.on('playerKilled', (data) => {
+            // Player was killed by a bullet
+            console.log(`Player ${data.targetId} killed by ${data.shooterId}`);
+        });
+
+        socket.on('attackAbilityExpired', (playerId) => {
+            // Attack ability expired
+            console.log(`Attack ability expired for player ${playerId}`);
         });
 
         socket.on('playerDied', (data) => {
@@ -753,9 +798,16 @@
             socket.emit('changeDirection', newDirection);
         }
 
+        // Handle shooting
+        function shoot() {
+            if (myPlayerId && players[myPlayerId] && players[myPlayerId].alive && players[myPlayerId].attackAbility) {
+                socket.emit('shoot');
+            }
+        }
+
         // Keyboard controls
         document.addEventListener('keydown', (e) => {
-            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'q', 'e', 'z', 'c'].includes(e.key)) {
+            if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'q', 'e', 'z', 'c', ' ', 'Enter'].includes(e.key)) {
                 e.preventDefault();
             }
 
@@ -795,6 +847,10 @@
                 case 'c':
                 case 'C':
                     changeDirection('downright');
+                    break;
+                case ' ':
+                case 'Enter':
+                    shoot();
                     break;
             }
         });
@@ -1104,6 +1160,54 @@
                 ctx.arc(centerX - 3, centerY - 3, 2, 0, Math.PI * 2);
                 ctx.fill();
             }
+
+            // Draw attack food (purple diamond)
+            if (attackFood) {
+                const centerX = attackFood.x * gridSize + gridSize / 2;
+                const centerY = attackFood.y * gridSize + gridSize / 2;
+                const size = gridSize / 2 - 2;
+
+                ctx.fillStyle = attackFoodColor;
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY - size);
+                ctx.lineTo(centerX + size, centerY);
+                ctx.lineTo(centerX, centerY + size);
+                ctx.lineTo(centerX - size, centerY);
+                ctx.closePath();
+                ctx.fill();
+                
+                // Add glow effect
+                ctx.shadowColor = attackFoodColor;
+                ctx.shadowBlur = 8;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                
+                // Add sparkle
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.beginPath();
+                ctx.arc(centerX - 2, centerY - 2, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Draw bullets
+            bullets.forEach(bullet => {
+                ctx.fillStyle = bulletColor;
+                ctx.beginPath();
+                ctx.arc(
+                    bullet.x * gridSize + gridSize / 2,
+                    bullet.y * gridSize + gridSize / 2,
+                    3,
+                    0,
+                    Math.PI * 2
+                );
+                ctx.fill();
+                
+                // Add glow effect
+                ctx.shadowColor = bulletColor;
+                ctx.shadowBlur = 5;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            });
         }
 
         // Skin Selection Functions
@@ -1213,7 +1317,16 @@
             
             // Add skin button event listener
             document.getElementById('skinBtn').addEventListener('click', openSkinSelection);
+            
+            // Add shoot button event listener
+            document.getElementById('shootBtn').addEventListener('click', shoot);
         });
+
+        // Bullet cleanup (remove old bullets)
+        setInterval(() => {
+            const now = Date.now();
+            bullets = bullets.filter(bullet => now - bullet.timestamp < 5000);
+        }, 1000);
 
         // Start drawing loop
         setInterval(drawGame, 50);

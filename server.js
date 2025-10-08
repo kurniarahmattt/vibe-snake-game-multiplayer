@@ -7,7 +7,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIO(server);
 
-const PORT = 8000;
+const PORT = 33337;
 
 // Main route - serve multiplayer.html
 app.get('/', (req, res) => {
@@ -22,11 +22,16 @@ const players = {};
 let food = null;
 let specialFood = null;
 let specialFoodTimer = 0;
+let attackFood = null;
+let attackFoodTimer = 0;
 
 const GRID_SIZE = 30;
 const TILE_COUNT = 30; // 30x30 grid = 900x900 pixels
 const SPECIAL_FOOD_SPAWN_CHANCE = 0.15;
 const SPECIAL_FOOD_DURATION = 10000;
+const ATTACK_FOOD_SPAWN_CHANCE = 0.10; // 10% chance
+const ATTACK_FOOD_DURATION = 15000; // 15 seconds
+const ATTACK_ABILITY_DURATION = 15000; // 15 seconds of shooting ability
 
 // Snake Skins
 const SNAKE_SKINS = {
@@ -179,6 +184,45 @@ function generateSpecialFood() {
     specialFoodTimer = Date.now() + SPECIAL_FOOD_DURATION;
 }
 
+function generateAttackFood() {
+    let validPosition = false;
+    let attempts = 0;
+    const maxAttempts = 100;
+    
+    while (!validPosition && attempts < maxAttempts) {
+        attackFood = {
+            x: Math.floor(Math.random() * TILE_COUNT),
+            y: Math.floor(Math.random() * TILE_COUNT)
+        };
+        
+        validPosition = true;
+        
+        // Check if not on any snake
+        for (let playerId in players) {
+            const player = players[playerId];
+            for (let segment of player.snake) {
+                if (segment.x === attackFood.x && segment.y === attackFood.y) {
+                    validPosition = false;
+                    break;
+                }
+            }
+            if (!validPosition) break;
+        }
+        
+        // Check if not on regular food or special food
+        if (food && attackFood.x === food.x && attackFood.y === food.y) {
+            validPosition = false;
+        }
+        if (specialFood && attackFood.x === specialFood.x && attackFood.y === specialFood.y) {
+            validPosition = false;
+        }
+        
+        attempts++;
+    }
+    
+    attackFoodTimer = Date.now() + ATTACK_FOOD_DURATION;
+}
+
 // Initialize first food
 generateFood();
 
@@ -205,7 +249,10 @@ io.on('connection', (socket) => {
         skinData: SNAKE_SKINS['classic'],
         alive: true,
         powerUpActive: false,
-        powerUpEndTime: 0
+        powerUpEndTime: 0,
+        attackAbility: false,
+        attackEndTime: 0,
+        bullets: []
     };
     
     // Send initial state to the new player
@@ -214,6 +261,7 @@ io.on('connection', (socket) => {
         players: players,
         food: food,
         specialFood: specialFood,
+        attackFood: attackFood,
         tileCount: TILE_COUNT,
         gridSize: GRID_SIZE
     });
@@ -253,6 +301,32 @@ io.on('connection', (socket) => {
         }
     });
     
+    // Handle shooting
+    socket.on('shoot', () => {
+        const player = players[socket.id];
+        if (player && player.alive && player.attackAbility && Date.now() < player.attackEndTime) {
+            // Create bullet in the direction the snake is moving
+            const head = player.snake[0];
+            const bullet = {
+                id: Date.now() + Math.random(), // Unique ID
+                x: head.x,
+                y: head.y,
+                dx: player.direction.dx,
+                dy: player.direction.dy,
+                owner: socket.id,
+                timestamp: Date.now()
+            };
+            
+            player.bullets.push(bullet);
+            
+            // Broadcast bullet creation
+            io.emit('bulletShot', {
+                playerId: socket.id,
+                bullet: bullet
+            });
+        }
+    });
+    
     // Handle disconnection
     socket.on('disconnect', () => {
         console.log(`Player disconnected: ${socket.id}`);
@@ -269,6 +343,12 @@ setInterval(() => {
         io.emit('specialFoodExpired');
     }
     
+    // Check attack food timer
+    if (attackFood && Date.now() >= attackFoodTimer) {
+        attackFood = null;
+        io.emit('attackFoodExpired');
+    }
+    
     // Update each player
     for (let playerId in players) {
         const player = players[playerId];
@@ -279,6 +359,62 @@ setInterval(() => {
         if (player.powerUpActive && Date.now() >= player.powerUpEndTime) {
             player.powerUpActive = false;
             io.emit('powerUpExpired', playerId);
+        }
+        
+        // Check attack ability expiration
+        if (player.attackAbility && Date.now() >= player.attackEndTime) {
+            player.attackAbility = false;
+            io.emit('attackAbilityExpired', playerId);
+        }
+        
+        // Update bullets
+        for (let i = player.bullets.length - 1; i >= 0; i--) {
+            const bullet = player.bullets[i];
+            bullet.x += bullet.dx;
+            bullet.y += bullet.dy;
+            
+            // Remove bullet if it goes off screen or is too old
+            if (bullet.x < 0 || bullet.x >= TILE_COUNT || 
+                bullet.y < 0 || bullet.y >= TILE_COUNT ||
+                Date.now() - bullet.timestamp > 5000) { // 5 second max lifetime
+                player.bullets.splice(i, 1);
+                continue;
+            }
+            
+            // Check bullet collision with other players
+            for (let otherPlayerId in players) {
+                if (otherPlayerId === playerId || otherPlayerId === bullet.owner) continue;
+                const otherPlayer = players[otherPlayerId];
+                if (!otherPlayer.alive) continue;
+                
+                // Check collision with other player's snake
+                for (let j = 0; j < otherPlayer.snake.length; j++) {
+                    const segment = otherPlayer.snake[j];
+                    if (bullet.x === segment.x && bullet.y === segment.y) {
+                        // Hit! Remove bullet and damage snake
+                        player.bullets.splice(i, 1);
+                        
+                        // Reduce snake length by 1
+                        if (otherPlayer.snake.length > 1) {
+                            otherPlayer.snake.pop();
+                            io.emit('playerHit', {
+                                shooterId: playerId,
+                                targetId: otherPlayerId,
+                                newLength: otherPlayer.snake.length
+                            });
+                        } else {
+                            // Snake dies if only 1 segment
+                            otherPlayer.alive = false;
+                            io.emit('playerKilled', {
+                                shooterId: playerId,
+                                targetId: otherPlayerId,
+                                score: otherPlayer.score
+                            });
+                        }
+                        break;
+                    }
+                }
+            }
         }
         
         // Update direction
@@ -343,8 +479,22 @@ setInterval(() => {
         
         player.snake.unshift(newHead);
         
+        // Check attack food collision
+        if (attackFood && newHead.x === attackFood.x && newHead.y === attackFood.y) {
+            player.score += 30;
+            attackFood = null;
+            
+            // Activate attack ability
+            player.attackAbility = true;
+            player.attackEndTime = Date.now() + ATTACK_ABILITY_DURATION;
+            
+            io.emit('attackFoodEaten', { 
+                playerId: playerId, 
+                score: player.score 
+            });
+        }
         // Check special food collision
-        if (specialFood && newHead.x === specialFood.x && newHead.y === specialFood.y) {
+        else if (specialFood && newHead.x === specialFood.x && newHead.y === specialFood.y) {
             player.score += 50;
             specialFood = null;
             
@@ -368,6 +518,12 @@ setInterval(() => {
                 io.emit('specialFoodSpawned', specialFood);
             }
             
+            // Chance to spawn attack food
+            if (!attackFood && Math.random() < ATTACK_FOOD_SPAWN_CHANCE) {
+                generateAttackFood();
+                io.emit('attackFoodSpawned', attackFood);
+            }
+            
             io.emit('foodEaten', { 
                 playerId: playerId, 
                 score: player.score, 
@@ -382,7 +538,8 @@ setInterval(() => {
     io.emit('gameState', {
         players: players,
         food: food,
-        specialFood: specialFood
+        specialFood: specialFood,
+        attackFood: attackFood
     });
     
 }, 100); // 100ms = 10 FPS
