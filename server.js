@@ -562,7 +562,7 @@ setInterval(() => {
         io.emit('gameState', currentState);
     }
     
-}, 33); // 33ms = 30 FPS for smoother gameplay
+}, 100); // 100ms = 10 FPS (normal speed) but with optimizations
 
 // Get local IP
 const os = require('os');

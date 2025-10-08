@@ -867,28 +867,6 @@
             }
 
             socket.emit('changeDirection', newDirection);
-            
-            // Client-side prediction for immediate response
-            if (myPlayerId && players[myPlayerId]) {
-                players[myPlayerId].nextDirection = newDirection;
-                // Apply movement immediately for local player
-                if (newDirection.dx !== 0 || newDirection.dy !== 0) {
-                    const head = players[myPlayerId].snake[0];
-                    const newHead = {
-                        x: head.x + newDirection.dx,
-                        y: head.y + newDirection.dy
-                    };
-                    
-                    // Wrap around walls for prediction
-                    if (newHead.x < 0) newHead.x = tileCount - 1;
-                    if (newHead.x >= tileCount) newHead.x = 0;
-                    if (newHead.y < 0) newHead.y = tileCount - 1;
-                    if (newHead.y >= tileCount) newHead.y = 0;
-                    
-                    players[myPlayerId].snake.unshift(newHead);
-                    players[myPlayerId].snake.pop();
-                }
-            }
         }
 
         // Handle shooting
@@ -1431,16 +1409,10 @@
             bullets = bullets.filter(bullet => now - bullet.timestamp < 5000);
         }, 1000);
 
-        // Interpolation loop for smooth movement
-        setInterval(() => {
-            if (lastGameState && interpolationFactor < 1) {
-                interpolationFactor += 0.1; // Smooth interpolation
-                if (interpolationFactor > 1) interpolationFactor = 1;
-            }
-        }, 16);
+        // Removed interpolation loop to prevent speed issues
 
-        // Start drawing loop at 60 FPS for smooth rendering
-        setInterval(drawGame, 16);
+        // Start drawing loop at 30 FPS for smooth but not excessive rendering
+        setInterval(drawGame, 33);
     </script>
 </body>
 </html>
