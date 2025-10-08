@@ -500,6 +500,7 @@
                         <p>🍎 Eat red food (+10 pts) to grow</p>
                         <p>⭐ Eat golden star (+50 pts) for INVINCIBILITY!</p>
                         <p>💜 Eat purple food (+30 pts) for ATTACK ABILITY!</p>
+                        <p>⚡ Eat lightning bolt (+25 pts) for SPEED BOOST!</p>
                         <p>🔫 Press SPACE/ENTER to shoot bullets (when you have attack ability)</p>
                         <p>🛡️ Power-up: RED blinking, pass through walls & snakes, 10 seconds</p>
                         <p>⚠️ Avoid other players and walls (unless invincible)!</p>
@@ -578,6 +579,7 @@
         let food = null;
         let specialFood = null;
         let attackFood = null;
+        let speedFood = null;
         let tileCount = 30;
         let gridSize = 30;
         let blinkState = {};
@@ -670,6 +672,7 @@
         const foodColor = '#ff6b6b';
         const specialFoodColor = '#ffd700';
         const attackFoodColor = '#8b5cf6'; // Purple
+        const speedFoodColor = '#ffd700'; // Gold/Yellow
         const bulletColor = '#ff4444';
         const gridColor = '#2a2a3e';
         const powerUpColor = '#ff3333';
@@ -740,6 +743,7 @@
             food = data.food;
             specialFood = data.specialFood;
             attackFood = data.attackFood;
+            speedFood = data.speedFood;
             tileCount = data.tileCount;
             gridSize = data.gridSize;
             
@@ -772,6 +776,7 @@
             food = data.food;
             specialFood = data.specialFood;
             attackFood = data.attackFood;
+            speedFood = data.speedFood;
             
             // Reset interpolation
             interpolationFactor = 0;
@@ -835,6 +840,28 @@
         socket.on('attackAbilityExpired', (playerId) => {
             // Attack ability expired
             console.log(`Attack ability expired for player ${playerId}`);
+        });
+        
+        socket.on('speedFoodSpawned', (data) => {
+            speedFood = data.speedFood;
+        });
+        
+        socket.on('speedFoodEaten', (data) => {
+            speedFood = null;
+            if (players[data.playerId]) {
+                players[data.playerId].speedBoost = true;
+                players[data.playerId].speedEndTime = data.speedEndTime;
+            }
+        });
+        
+        socket.on('speedFoodExpired', () => {
+            speedFood = null;
+        });
+        
+        socket.on('speedBoostExpired', (playerId) => {
+            if (players[playerId]) {
+                players[playerId].speedBoost = false;
+            }
         });
 
         socket.on('playerDied', (data) => {
@@ -1317,6 +1344,40 @@
                 ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
                 ctx.beginPath();
                 ctx.arc(centerX - 2, centerY - 2, 1.5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Draw speed food (lightning bolt)
+            if (speedFood) {
+                const centerX = speedFood.x * gridSize + gridSize / 2;
+                const centerY = speedFood.y * gridSize + gridSize / 2;
+                const size = gridSize / 2 - 2;
+
+                ctx.fillStyle = speedFoodColor;
+                ctx.beginPath();
+                
+                // Draw lightning bolt shape
+                ctx.moveTo(centerX - size/2, centerY - size);
+                ctx.lineTo(centerX + size/3, centerY - size/3);
+                ctx.lineTo(centerX - size/3, centerY);
+                ctx.lineTo(centerX + size/2, centerY + size);
+                ctx.lineTo(centerX - size/3, centerY + size/3);
+                ctx.lineTo(centerX + size/3, centerY);
+                ctx.lineTo(centerX - size/2, centerY - size);
+                
+                ctx.closePath();
+                ctx.fill();
+                
+                // Add glow effect
+                ctx.shadowColor = speedFoodColor;
+                ctx.shadowBlur = 10;
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                
+                // Add sparkle
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                ctx.beginPath();
+                ctx.arc(centerX - 1, centerY - 1, 1, 0, Math.PI * 2);
                 ctx.fill();
             }
 

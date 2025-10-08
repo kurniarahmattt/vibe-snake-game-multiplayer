@@ -38,6 +38,8 @@ let specialFood = null;
 let specialFoodTimer = 0;
 let attackFood = null;
 let attackFoodTimer = 0;
+let speedFood = null;
+let speedFoodTimer = 0;
 
 const GRID_SIZE = 30;
 const TILE_COUNT = 30; // 30x30 grid = 900x900 pixels
@@ -46,6 +48,9 @@ const SPECIAL_FOOD_DURATION = 10000;
 const ATTACK_FOOD_SPAWN_CHANCE = 0.10; // 10% chance
 const ATTACK_FOOD_DURATION = 15000; // 15 seconds
 const ATTACK_ABILITY_DURATION = 15000; // 15 seconds of shooting ability
+const SPEED_FOOD_SPAWN_CHANCE = 0.12; // 12% chance
+const SPEED_FOOD_DURATION = 12000; // 12 seconds
+const SPEED_BOOST_DURATION = 10000; // 10 seconds of speed boost
 
 // Snake Skins
 const SNAKE_SKINS = {
@@ -237,6 +242,48 @@ function generateAttackFood() {
     attackFoodTimer = Date.now() + ATTACK_FOOD_DURATION;
 }
 
+function generateSpeedFood() {
+    let validPosition = false;
+    let attempts = 0;
+    const maxAttempts = 100;
+    
+    while (!validPosition && attempts < maxAttempts) {
+        speedFood = {
+            x: Math.floor(Math.random() * TILE_COUNT),
+            y: Math.floor(Math.random() * TILE_COUNT)
+        };
+        
+        validPosition = true;
+        
+        // Check if not on any snake
+        for (let playerId in players) {
+            const player = players[playerId];
+            for (let segment of player.snake) {
+                if (segment.x === speedFood.x && segment.y === speedFood.y) {
+                    validPosition = false;
+                    break;
+                }
+            }
+            if (!validPosition) break;
+        }
+        
+        // Check if not on regular food, special food, or attack food
+        if (food && speedFood.x === food.x && speedFood.y === food.y) {
+            validPosition = false;
+        }
+        if (specialFood && speedFood.x === specialFood.x && speedFood.y === specialFood.y) {
+            validPosition = false;
+        }
+        if (attackFood && speedFood.x === attackFood.x && speedFood.y === attackFood.y) {
+            validPosition = false;
+        }
+        
+        attempts++;
+    }
+    
+    speedFoodTimer = Date.now() + SPEED_FOOD_DURATION;
+}
+
 // Initialize first food
 generateFood();
 
@@ -271,7 +318,9 @@ io.on('connection', (socket) => {
         powerUpEndTime: 0,
         attackAbility: false,
         attackEndTime: 0,
-        bullets: []
+        bullets: [],
+        speedBoost: false,
+        speedEndTime: 0
     };
     
     // Send initial state to the new player
@@ -281,6 +330,7 @@ io.on('connection', (socket) => {
         food: food,
         specialFood: specialFood,
         attackFood: attackFood,
+        speedFood: speedFood,
         tileCount: TILE_COUNT,
         gridSize: GRID_SIZE
     });
@@ -376,6 +426,12 @@ setInterval(() => {
         io.emit('attackFoodExpired');
     }
     
+    // Check speed food timer
+    if (speedFood && Date.now() >= speedFoodTimer) {
+        speedFood = null;
+        io.emit('speedFoodExpired');
+    }
+    
     // Update each player
     for (let playerId in players) {
         const player = players[playerId];
@@ -392,6 +448,12 @@ setInterval(() => {
         if (player.attackAbility && Date.now() >= player.attackEndTime) {
             player.attackAbility = false;
             io.emit('attackAbilityExpired', playerId);
+        }
+        
+        // Check speed boost expiration
+        if (player.speedBoost && Date.now() >= player.speedEndTime) {
+            player.speedBoost = false;
+            io.emit('speedBoostExpired', playerId);
         }
         
         // Update bullets
@@ -450,11 +512,14 @@ setInterval(() => {
         // Skip if not moving
         if (player.direction.dx === 0 && player.direction.dy === 0) continue;
         
-        // Move snake
-        let newHead = {
-            x: player.snake[0].x + player.direction.dx,
-            y: player.snake[0].y + player.direction.dy
-        };
+        // Move snake (speed boost makes player move twice per turn)
+        const moveCount = player.speedBoost ? 2 : 1;
+        
+        for (let move = 0; move < moveCount; move++) {
+            let newHead = {
+                x: player.snake[0].x + player.direction.dx,
+                y: player.snake[0].y + player.direction.dy
+            };
         
         // Handle wall collision
         if (player.powerUpActive) {
@@ -520,6 +585,21 @@ setInterval(() => {
                 score: player.score 
             });
         }
+        
+        // Check speed food collision
+        if (speedFood && newHead.x === speedFood.x && newHead.y === speedFood.y) {
+            player.score += 25;
+            speedFood = null;
+            
+            // Activate speed boost
+            player.speedBoost = true;
+            player.speedEndTime = Date.now() + SPEED_BOOST_DURATION;
+            
+            io.emit('speedFoodEaten', { 
+                playerId: playerId, 
+                score: player.score 
+            });
+        }
         // Check special food collision
         else if (specialFood && newHead.x === specialFood.x && newHead.y === specialFood.y) {
             player.score += 50;
@@ -551,6 +631,12 @@ setInterval(() => {
                 io.emit('attackFoodSpawned', attackFood);
             }
             
+            // Chance to spawn speed food
+            if (!speedFood && Math.random() < SPEED_FOOD_SPAWN_CHANCE) {
+                generateSpeedFood();
+                io.emit('speedFoodSpawned', speedFood);
+            }
+            
             io.emit('foodEaten', { 
                 playerId: playerId, 
                 score: player.score, 
@@ -559,6 +645,7 @@ setInterval(() => {
         } else {
             player.snake.pop();
         }
+        } // End of speed boost for loop
     }
     
     // Broadcast game state (optimized - only send if there are changes)
@@ -566,7 +653,8 @@ setInterval(() => {
         players: players,
         food: food,
         specialFood: specialFood,
-        attackFood: attackFood
+        attackFood: attackFood,
+        speedFood: speedFood
     };
     
     // Only broadcast if there are active players
