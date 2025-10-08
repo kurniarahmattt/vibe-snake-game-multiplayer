@@ -51,23 +51,24 @@
         }
 
         .game-sidebar {
-            flex: 0 0 300px;
-            min-width: 280px;
-            max-width: 350px;
+            flex: 0 0 400px;
+            min-width: 380px;
+            max-width: 450px;
         }
 
         .sidebar-section {
             background: rgba(255, 255, 255, 0.1);
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 25px;
         }
 
         .sidebar-section h3 {
-            margin: 0 0 15px 0;
-            font-size: 1.2em;
+            margin: 0 0 20px 0;
+            font-size: 1.5em;
             text-align: center;
             color: #4ecca3;
+            font-weight: 600;
         }
 
         h1 {
@@ -116,10 +117,11 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 8px;
-            margin: 5px 0;
+            padding: 12px;
+            margin: 8px 0;
             background: rgba(255, 255, 255, 0.1);
-            border-radius: 5px;
+            border-radius: 8px;
+            font-size: 1.1em;
         }
 
         .player-color {
@@ -136,9 +138,9 @@
         }
 
         .instructions {
-            font-size: 0.9em;
+            font-size: 1.1em;
             opacity: 0.9;
-            line-height: 1.6;
+            line-height: 1.8;
         }
 
         .game-over {
@@ -384,7 +386,7 @@
             font-size: 20px;
         }
 
-        @media (max-width: 1200px) {
+        @media (max-width: 1400px) {
             .game-layout {
                 flex-direction: column;
             }
@@ -861,6 +863,16 @@
 
         // Keyboard controls
         document.addEventListener('keydown', (e) => {
+            // Check if game over screen is showing
+            if (gameOverElement.classList.contains('show')) {
+                if ([' ', 'Enter', 'a', 'w', 's', 'd', 'A', 'W', 'S', 'D'].includes(e.key)) {
+                    e.preventDefault();
+                    // Trigger play again
+                    location.reload();
+                }
+                return;
+            }
+
             if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd', 'q', 'e', 'z', 'c', ' ', 'Enter'].includes(e.key)) {
                 e.preventDefault();
             }
