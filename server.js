@@ -2,10 +2,24 @@ const express = require('express');
 const http = require('http');
 const socketIO = require('socket.io');
 const path = require('path');
+const compression = require('compression');
 
 const app = express();
+
+// Add compression middleware for better network performance
+app.use(compression());
+
 const server = http.createServer(app);
-const io = socketIO(server);
+const io = socketIO(server, {
+    pingTimeout: 60000,
+    pingInterval: 25000,
+    transports: ['websocket', 'polling'],
+    allowEIO3: true,
+    cors: {
+        origin: "*",
+        methods: ["GET", "POST"]
+    }
+});
 
 const PORT = 33337;
 
@@ -534,15 +548,21 @@ setInterval(() => {
         }
     }
     
-    // Broadcast game state
-    io.emit('gameState', {
+    // Broadcast game state (optimized - only send if there are changes)
+    const currentState = {
         players: players,
         food: food,
         specialFood: specialFood,
         attackFood: attackFood
-    });
+    };
     
-}, 100); // 100ms = 10 FPS
+    // Only broadcast if there are active players
+    const activePlayers = Object.values(players).filter(p => p.alive);
+    if (activePlayers.length > 0) {
+        io.emit('gameState', currentState);
+    }
+    
+}, 33); // 33ms = 30 FPS for smoother gameplay
 
 // Get local IP
 const os = require('os');
