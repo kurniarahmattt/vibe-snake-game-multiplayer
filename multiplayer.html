@@ -564,7 +564,15 @@
         const gameOverElement = document.getElementById('gameOver');
         const connectionStatusElement = document.getElementById('connectionStatus');
 
-        let socket = io();
+        let socket = io({
+            transports: ['websocket', 'polling'],
+            timeout: 20000,
+            forceNew: false,
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionAttempts: 5,
+            maxReconnectionAttempts: 5
+        });
         let myPlayerId = null;
         let players = {};
         let food = null;
@@ -682,10 +690,47 @@
         socket.on('connect', () => {
             connectionStatusElement.textContent = '✅ Connected';
             connectionStatusElement.className = 'connection-status connected';
+            console.log('Connected to server');
+        });
+        
+        socket.on('reconnect', (attemptNumber) => {
+            connectionStatusElement.textContent = '🔄 Reconnected';
+            connectionStatusElement.className = 'connection-status connected';
+            console.log(`Reconnected after ${attemptNumber} attempts`);
+        });
+        
+        socket.on('reconnect_attempt', (attemptNumber) => {
+            connectionStatusElement.textContent = `🔄 Reconnecting... (${attemptNumber}/5)`;
+            connectionStatusElement.className = 'connection-status disconnected';
+            console.log(`Reconnection attempt ${attemptNumber}`);
+        });
+        
+        socket.on('reconnect_failed', () => {
+            connectionStatusElement.textContent = '❌ Reconnection Failed';
+            connectionStatusElement.className = 'connection-status disconnected';
+            console.log('Failed to reconnect after 5 attempts');
         });
 
         socket.on('disconnect', () => {
             connectionStatusElement.textContent = '⚠️ Disconnected';
+            connectionStatusElement.className = 'connection-status disconnected';
+            
+            // Auto-reconnect after 2 seconds
+            setTimeout(() => {
+                console.log('Attempting to reconnect...');
+                socket.connect();
+            }, 2000);
+        });
+        
+        // Handle ping from server
+        socket.on('ping', () => {
+            socket.emit('pong');
+        });
+        
+        // Handle connection errors
+        socket.on('connect_error', (error) => {
+            console.log('Connection error:', error);
+            connectionStatusElement.textContent = '❌ Connection Error';
             connectionStatusElement.className = 'connection-status disconnected';
         });
 
@@ -823,6 +868,8 @@
                         currentDirection.dx !== 0 && currentDirection.dy !== 0);
             };
 
+            // Track direction changes for debugging if needed
+
             switch (direction) {
                 case 'up':
                     if (currentDirection.dy !== 1 || currentDirection.dx !== 0) {
@@ -866,7 +913,10 @@
                     break;
             }
 
-            socket.emit('changeDirection', newDirection);
+            // Ensure direction is valid before sending
+            if (newDirection.dx !== currentDirection.dx || newDirection.dy !== currentDirection.dy) {
+                socket.emit('changeDirection', newDirection);
+            }
         }
 
         // Handle shooting

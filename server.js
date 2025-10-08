@@ -244,6 +244,11 @@ generateFood();
 io.on('connection', (socket) => {
     console.log(`Player connected: ${socket.id}`);
     
+    // Set up heartbeat to detect disconnections
+    socket.heartbeat = setInterval(() => {
+        socket.emit('ping');
+    }, 25000); // Ping every 25 seconds
+    
     // Assign color to player (fallback)
     const colorIndex = Object.keys(players).length % PLAYER_COLORS.length;
     const playerColor = PLAYER_COLORS[colorIndex];
@@ -341,9 +346,17 @@ io.on('connection', (socket) => {
         }
     });
     
+    // Handle pong response
+    socket.on('pong', () => {
+        // Player is alive, no action needed
+    });
+    
     // Handle disconnection
     socket.on('disconnect', () => {
         console.log(`Player disconnected: ${socket.id}`);
+        if (socket.heartbeat) {
+            clearInterval(socket.heartbeat);
+        }
         delete players[socket.id];
         io.emit('playerLeft', socket.id);
     });
